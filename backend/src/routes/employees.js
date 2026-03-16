@@ -16,7 +16,7 @@ router.post(
         data: {
           employeeNumber: req.body.employeeNumber,
           firstName: req.body.firstName,
-          middleName: req.body.middleName,
+          middleName: req.body.middleName,          
           lastName: req.body.lastName,
           email: req.body.email,
           dateOfBirth: new Date(req.body.dateOfBirth),
@@ -42,7 +42,7 @@ router.post(
 router.get(
   "/",
   authenticate,
-  authorize(["ADMIN", "PROJECT_MANAGER"]),
+  // authorize(["ADMIN", "PROJECT_MANAGER"]),
   async (req, res) => {
     try {
       const employees = await prisma.employee.findMany({
@@ -78,3 +78,5 @@ router.get(
 );
 
 export default router;
+
+ 

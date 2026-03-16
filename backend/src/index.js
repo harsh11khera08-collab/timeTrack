@@ -20,6 +20,7 @@ import notificationRoutes from './routes/notifications.js';
 import incidentRoutes from './routes/incidents.js';
 import taskRoutes from "./routes/task.js";
 import testRoutes from "./routes/testRoutes.js";
+import ProjectMemberRoutes from "./routes/projectsMember.js";
 
 // Services
 import { runChaserJob } from './services/chaserJob.js';
@@ -57,6 +58,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/tasks',taskRoutes);
 app.use('/api/test',testRoutes);
+app.use('/api/project-members',ProjectMemberRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
