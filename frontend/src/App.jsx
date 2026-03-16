@@ -7,8 +7,11 @@ import { createTimesheet } from "./services/api";
 import { updateTimesheet } from "./services/api";
 import { deleteProject } from "./services/api";
 import { deleteTimesheet } from "./services/api";
+import { fetchTasks } from "./services/api";
+import { createTasks } from "./services/api";
 import { AuthenticatedTemplate, useMsal ,UnauthenticatedTemplate} from "@azure/msal-react";
 import { InteractionStatus } from "@azure/msal-browser";
+import TestAPI from "./services/testApi.jsx";
 
 // ─── Context ────────────────────────────────────────────────────────────────
 const AppContext = createContext(null);
@@ -407,6 +410,7 @@ const StatusBadge = ({ status }) => {
     nonbillable: { label: "Non-Billable", color: COLORS.slate },
     milestone: { label: "Milestone", color: COLORS.purple },
     task: { label: "Task", color: COLORS.blue },
+    notstarted:  { label: "Not Started", color: "#64748B" },
   };
   const s = map[status] || { label: status, color: COLORS.slate };
   return <Badge label={s.label} color={s.color} small />;
@@ -814,7 +818,7 @@ const Notification = ({ notifs, onClear }) => (
 
 // ─── Views ────────────────────────────────────────────────────────────────────
 
-function Dashboard({ timesheets, incidents, projects, employees }) {
+function Dashboard({ timesheets, incidents, projects, employees ,currentUser}) {
   const thisWeek = getWeekDates();
   const billableHrs = timesheets
     .filter((t) => t.billable && t.status !== "draft")
@@ -848,7 +852,7 @@ function Dashboard({ timesheets, incidents, projects, employees }) {
             fontFamily: "Sora, sans-serif",
           }}
         >
-          Hello, Alex 👋
+          Hello , {currentUser?.name?.split(" ")[0] || "there"} 👋
         </h2>
         <p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 14 }}>
           Here's what's happening across your projects today.
@@ -1633,10 +1637,53 @@ function ProjectDetail({ project, employees, tasks, onBack }) {
   const [activeTab, setActiveTab] = useState("wbs");
   const [showWBSModal, setShowWBSModal] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
+  const [task,setTask] = useState([]);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+  title: "",
+  description: "",
+  type: "TASK",
+  milestone: "",
+  assigneeId: "",
+  startDate: "",
+  endDate: "",
+  estimatedHours: "",
+  status: "NOT_STARTED",
+  sortOrder: 0,
+});
+const loadTasks = async () => {
+  const data = await fetchTasks(project.id);
+  const taskArray = Array.isArray(data) ? data : data.data || [];
+
+  const formatted = taskArray.map(task => ({
+    id: task.id,
+    title: task.title,
+    type: task.type?.toLowerCase(),
+    milestone: task.milestone,
+    assignee: task.assigneeId,
+    startDate: task.startDate,
+    endDate: task.endDate,
+    estimatedHours: task.estimatedHours,
+    status: task.status?.toLowerCase().replace("_", ""),
+    description: task.description,
+    projectId: task.projectId,
+  }));
+
+  setTask(formatted);
+};
+ const handleCreate = async () => {
+  const result = await createTasks({...taskForm,projectId:project.id});
+  await loadTasks();
+  console.log(result);
+ }
+
+    useEffect(()=> {
+      loadTasks();
+    },[project.id]);
 
   const projTasks = tasks.filter((t) => t.projectId === project.id);
   const milestones = [
-    ...new Set(projTasks.filter((t) => t.milestone).map((t) => t.milestone)),
+    ...new Set(task.filter((t) => t.milestone).map((t) => t.milestone)),
   ];
   const members = employees.filter((e) =>
     project.assignedMembers.includes(e.id),
@@ -1728,7 +1775,7 @@ function ProjectDetail({ project, employees, tasks, onBack }) {
             >
               📤 Upload WBS
             </Btn>
-            <Btn small>➕ Add Task</Btn>
+            <Btn small onClick={() => setShowAddTask(true)}>➕ Add Task</Btn>
           </div>
         )}
         {activeTab === "team" && (
@@ -1768,7 +1815,7 @@ function ProjectDetail({ project, employees, tasks, onBack }) {
                   {ms}
                 </span>
               </div>
-              {projTasks
+              {task
                 .filter((t) => t.milestone === ms)
                 .map((task) => {
                   const assignee = employees.find(
@@ -1835,7 +1882,7 @@ function ProjectDetail({ project, employees, tasks, onBack }) {
                 })}
             </div>
           ))}
-          {projTasks
+          {task
             .filter((t) => !t.milestone)
             .map((task) => (
               <div
@@ -2085,7 +2132,110 @@ function ProjectDetail({ project, employees, tasks, onBack }) {
           </div>
         </Modal>
       )}
+      {showAddTask && (
+  <Modal title="Add Task" onClose={() => setShowAddTask(false)}>
+    <FormField label="Title" required>
+      <Input
+        value={taskForm.title}
+        onChange={e => setTaskForm({ ...taskForm, title: e.target.value })}
+        placeholder="e.g. Build Login Page"
+      />
+    </FormField>
+
+    <FormField label="Description">
+      <Textarea
+        value={taskForm.description}
+        onChange={e => setTaskForm({ ...taskForm, description: e.target.value })}
+        placeholder="Task description"
+      />
+    </FormField>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <FormField label="Type">
+        <Select
+          value={taskForm.type}
+          onChange={e => setTaskForm({ ...taskForm, type: e.target.value })}
+        >
+          <option value="TASK">Task</option>
+          <option value="MILESTONE">Milestone</option>
+        </Select>
+      </FormField>
+
+      <FormField label="Status">
+        <Select
+          value={taskForm.status}
+          onChange={e => setTaskForm({ ...taskForm, status: e.target.value })}
+        >
+          <option value="NOT_STARTED">Not Started</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="COMPLETED">Completed</option>
+        </Select>
+      </FormField>
     </div>
+
+    <FormField label="Milestone">
+      <Input
+        value={taskForm.milestone}
+        onChange={e => setTaskForm({ ...taskForm, milestone: e.target.value })}
+        placeholder="e.g. M1 - Foundation"
+      />
+    </FormField>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <FormField label="Start Date" required>
+        <Input
+          type="date"
+          value={taskForm.startDate}
+          onChange={e => setTaskForm({ ...taskForm, startDate: e.target.value })}
+        />
+      </FormField>
+
+      <FormField label="End Date" required>
+        <Input
+          type="date"
+          value={taskForm.endDate}
+          onChange={e => setTaskForm({ ...taskForm, endDate: e.target.value })}
+        />
+      </FormField>
+    </div>
+
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <FormField label="Estimated Hours">
+        <Input
+          type="number"
+          value={taskForm.estimatedHours}
+          onChange={e => setTaskForm({ ...taskForm, estimatedHours: e.target.value })}
+          placeholder="16"
+        />
+      </FormField>
+
+      <FormField label="Sort Order">
+        <Input
+          type="number"
+          value={taskForm.sortOrder}
+          onChange={e => setTaskForm({ ...taskForm, sortOrder: e.target.value })}
+          placeholder="0"
+        />
+      </FormField>
+    </div>
+
+    <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 8 }}>
+      <Btn variant="secondary" onClick={() => setShowAddTask(false)}>Cancel</Btn>
+      <Btn
+        onClick={ async () => {
+          console.log("task form data:", { projectId: project.id, ...taskForm });
+          await handleCreate();
+          setShowAddTask(false);
+        }}
+        disabled={!taskForm.title || !taskForm.startDate || !taskForm.endDate}
+      >
+        Create Task
+      </Btn>
+    </div>
+  </Modal>
+)}
+    </div>
+    
   );
 }
 
@@ -4072,7 +4222,7 @@ export default function App() {
   //   return storedUser ? JSON.parse(storedUser) : null;
   // });
   const {instance , accounts, inprogress} = useMsal();
-
+ 
   useEffect(() => {
     if (inprogress === InteractionStatus.None) {
       instance.handleRedirectPromise().catch(console.error);
@@ -4095,6 +4245,7 @@ export default function App() {
   const [notifCount, setNotifCount] = useState(3);
   const [showAIChase, setShowAIChase] = useState(false);
   const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
     const loadTimesheets = async () => {
@@ -4124,12 +4275,11 @@ export default function App() {
 
     loadTimesheets();
   }, []);
-
-  useEffect(() => {
-    const loadProjects = async () => {
+const loadProjects=async()=> {
       try {
+        console.log("load")
+        
         const apiProjects = await fetchProjects();
-
         const formatted = apiProjects.map((p) => ({
           ...p,
           status: p.status.toLowerCase(), // ACTIVE -> active
@@ -4137,19 +4287,67 @@ export default function App() {
           progress: 0, // until calculated
           assignedMembers: p.members || [],
         }));
-
         setProjects(formatted);
       } catch (err) {
         console.error(err);
       }
-    };
+    }
+   
+  useEffect(() => {
+     loadProjects();
+  },[]);
+  useEffect(() => {
+  if (inprogress === InteractionStatus.None && accounts.length > 0) {
+    instance.acquireTokenSilent({
+      scopes: ["openid", "profile", "email", "User.Read"],
+      account: accounts[0],
+    }).then(response => {
+      console.log("=== ACCESS TOKEN ===");
+      console.log(response.accessToken);
+    }).catch(err => {
+      console.error("Token error:", err);
+    });
+  }
+}, [inprogress, accounts, instance]);
 
-    loadProjects();
-  }, []);
+useEffect(() => {
+  
+  if (accounts.length === 0) return;
+    
+  console.log("full account:", accounts[0]); // 👈 add this
 
-  const handleSelectProject = (p) => {
+  const email = accounts[0].username;
+  console.log("email:", email); 
+    
+
+    fetch("http://localhost:4000/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email , password:"Azure_Ad_user"}),
+    })
+    .then(res => res.json())
+    .then(data => {
+  console.log("backend response:", data); // 👈 check this
+  
+  localStorage.setItem("token", data.token);
+  loadProjects();
+});  
+}, [accounts]);
+
+  // const handleSelectProject = (p) => {
+  //   setSelectedProject(p);
+  //   setActiveView("projectDetail");
+  // };
+
+  const handleSelectProject = async (p) => {
     setSelectedProject(p);
     setActiveView("projectDetail");
+    try {
+       const data = await fetchTasks(p.id);
+       console.log("data : ",data);
+    } catch(err) {
+      console.log(err);
+    }
   };
 
   const renderView = () => {
@@ -4161,6 +4359,7 @@ export default function App() {
             incidents={incidents}
             projects={projects}
             employees={MOCK_EMPLOYEES}
+            currentUser = {user}
           />
         );
       case "projects":
@@ -4442,7 +4641,9 @@ export default function App() {
                 //   setUser(null);
                 // }}
                 onClick={() => {
-  instance.logoutRedirect({ postLogoutRedirectUri: "http://localhost:3000" });
+                  localStorage.removeItem("token");
+                  // setUser(null)
+  instance.logoutRedirect({ postLogoutRedirectUri: "http://localhost:3000" })
 }}
                 style={{
                   background: "transparent",
@@ -4501,6 +4702,7 @@ export default function App() {
               >
                 🔗 Keka: Connected
               </div>
+              {/* <TestAPI/> */}
               <Notification
                 notifs={notifCount}
                 onClear={() => setNotifCount(0)}

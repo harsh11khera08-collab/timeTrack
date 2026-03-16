@@ -18,6 +18,8 @@ import reportsRoutes from './routes/reports.js';
 import kekaRoutes from './routes/keka.js';
 import notificationRoutes from './routes/notifications.js';
 import incidentRoutes from './routes/incidents.js';
+import taskRoutes from "./routes/task.js";
+import testRoutes from "./routes/testRoutes.js";
 
 // Services
 import { runChaserJob } from './services/chaserJob.js';
@@ -53,6 +55,8 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/keka', kekaRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/incidents', incidentRoutes);
+app.use('/api/tasks',taskRoutes);
+app.use('/api/test',testRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

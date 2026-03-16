@@ -6,16 +6,18 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-router.get('/', authenticate, async (req, res) => {
+router.get('/', 
+  authenticate,
+   async (req, res) => {
   try {
-    const where = req.user.role === 'EMPLOYEE'
-      ? { members: { some: { userId: req.user.id } } }
-      : {};
-
+    // const where = req.user.role === 'EMPLOYEE'
+    //   ? { members: { some: { userId: req.user.id } } }
+    //   : {};
+    
     const projects = await prisma.project.findMany({
-      where,
+      //where,
       include: {
-        members: { include: { user: { select: { id: true, name: true, email: true, employmentType: true } } } },
+        members: { include: { employee: { select: {  firstName: true, email: true} } } },
         tasks: { orderBy: { sortOrder: 'asc' } },
         _count: { select: { timesheetEntries: true } },
       },
@@ -37,7 +39,8 @@ router.post('/', authenticate, authorize(['ADMIN', 'PROJECT_MANAGER']), async (r
   }
 });
 
-router.get('/:id', authenticate, async (req, res) => {
+router.get('/:id', authenticate, 
+  async (req, res) => {
   try {
     const project = await prisma.project.findUnique({
       where: { id: req.params.id },
@@ -65,7 +68,8 @@ router.patch('/:id', authenticate, authorize(['ADMIN', 'PROJECT_MANAGER']), asyn
   }
 });
 
-router.post('/:id/members', authenticate, authorize(['ADMIN', 'PROJECT_MANAGER']), async (req, res) => {
+router.post('/:id/members', 
+  authenticate, authorize(['ADMIN', 'PROJECT_MANAGER']), async (req, res) => {
   try {
     const member = await prisma.projectMember.create({
       data: { projectId: req.params.id, ...req.body },
