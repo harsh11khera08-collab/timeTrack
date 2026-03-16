@@ -1,0 +1,88 @@
+version: '3.9'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: timetrack-db
+    environment:
+      POSTGRES_USER: timetrack
+      POSTGRES_PASSWORD: timetrack_dev_pass
+      POSTGRES_DB: timetrack
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timetrack"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (for job queues and session cache)
+  redis:
+    image: redis:7-alpine
+    container_name: timetrack-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: timetrack-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://timetrack:timetrack_dev_pass@postgres:5432/timetrack
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev_jwt_secret_change_in_production
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3000
+      # Keka - fill in your credentials
+      KEKA_BASE_URL: https://api.keka.com/v1
+      KEKA_API_TOKEN: your_keka_api_token_here
+      # Claude AI
+      ANTHROPIC_API_KEY: your_anthropic_api_key_here
+      CHASE_TONE: friendly
+      CHASE_AFTER_DAYS: 5
+      MAX_CHASES: 3
+      # MS Teams
+      TEAMS_WEBHOOK_URL: your_teams_webhook_url_here
+      NOTIFICATION_CHANNEL: BOTH
+      # SMTP (Outlook/Office365)
+      SMTP_HOST: smtp.office365.com
+      SMTP_PORT: 587
+      SMTP_USER: timetrack@yourcompany.com
+      SMTP_PASS: your_smtp_password
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+
+  # Frontend Dev Server
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: timetrack-ui
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  redis_data:
