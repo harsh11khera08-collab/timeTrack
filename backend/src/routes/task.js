@@ -22,7 +22,7 @@ router.get("/",
         include: {
             assignee: {
                 select:{
-                    id:true,email:true,name:true
+                    id:true,email:true
                 }
             }
         },
@@ -30,7 +30,7 @@ router.get("/",
        });
        res.json(tasks);
     } catch(err) {
-        res.status(500).json({success:false,error:"failed to fetch the task"});
+        res.status(500).json({success:false,error:"failed to fetch the task : ",err});
     }
 })
 
@@ -68,7 +68,7 @@ if(!projectId) {
             },
             include: {
                 assignee: {
-                    select: { id: true, name: true, email: true }
+                    select: { id: true, email: true }
                 }
             }
         });
